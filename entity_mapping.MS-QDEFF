@@ -1,0 +1,194 @@
+let
+    Source = SharePoint.Tables(
+        "https://briggsequipment.sharepoint.com/sites/FinanceMasterData",
+        [Implementation="2.0", ViewMode="All"]
+    ),
+
+    EntityMapping =
+        Source{[Title="MAP - 2002-R - BUK Peel Ports"]}[Items],
+
+    MergeIFSAccounts =
+        Table.NestedJoin(
+            EntityMapping,
+            {"IFS Account"},
+            #"MAP - IFS Accounts",
+            {"IFS Account"},
+            "MAP - IFS Accounts",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandIFSAccounts =
+        Table.ExpandTableColumn(
+            MergeIFSAccounts,
+            "MAP - IFS Accounts",
+            {
+                "IFS Account Description",
+                "Account Type",
+                "Account Group"
+            },
+            {
+                "IFS Account Description",
+                "Account Type",
+                "Account Group"
+            }
+        ),
+
+    KeepRequiredColumns =
+        Table.SelectColumns(ExpandIFSAccounts,{"Entity Account", "Reporting Entity", "Entity Account Description", "PL_BS", "M3 Nominal", "M3 RL", "M3 CST", "IFS Account", "IFS Department", "IFS Location", "IFS Market", "IFS Company", "Active", "Modified", "Version", "IFS Account Description", "Account Type", "Account Group"}),
+
+    MergeAccountGroups =
+        Table.NestedJoin(
+            KeepRequiredColumns,
+            {"Account Group"},
+            #"MAP - Account Groups",
+            {"Account Group"},
+            "MAP - Account Groups",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandAccountGroups =
+        Table.ExpandTableColumn(
+            MergeAccountGroups,
+            "MAP - Account Groups",
+            {"Account Group Description"},
+            {"Account Group Description"}
+        ),
+
+    MergeAccountTypes =
+        Table.NestedJoin(
+            ExpandAccountGroups,
+            {"Account Type"},
+            #"MAP - Account Types",
+            {"Account Type"},
+            "MAP - Account Types",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandAccountTypes =
+        Table.ExpandTableColumn(
+            MergeAccountTypes,
+            "MAP - Account Types",
+            {"Account  Type Description"},
+            {"Account Type Description"}
+        ),
+
+    MergeDepartments =
+        Table.NestedJoin(
+            ExpandAccountTypes,
+            {"IFS Department"},
+            #"MAP - IFS Departments",
+            {"Department"},
+            "MAP - IFS Departments",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandDepartments =
+        Table.ExpandTableColumn(
+            MergeDepartments,
+            "MAP - IFS Departments",
+            {"Department Description"},
+            {"Department Description"}
+        ),
+
+    MergeLocations =
+        Table.NestedJoin(
+            ExpandDepartments,
+            {"IFS Location"},
+            #"MAP - IFS Locations",
+            {"Location"},
+            "MAP - IFS Locations",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandLocations =
+        Table.ExpandTableColumn(
+            MergeLocations,
+            "MAP - IFS Locations",
+            {"Location Description"},
+            {"Location Description"}
+        ),
+
+    MergeMarkets =
+        Table.NestedJoin(
+            ExpandLocations,
+            {"IFS Market"},
+            #"MAP - IFS Markets",
+            {"Market"},
+            "MAP - IFS Markets",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandMarkets =
+        Table.ExpandTableColumn(
+            MergeMarkets,
+            "MAP - IFS Markets",
+            {"Market Description"},
+            {"Market Description"}
+        ),
+
+    MergeCompany =
+        Table.NestedJoin(
+            ExpandMarkets,
+            {"IFS Company"},
+            #"MAP - IFS Company Code Parts",
+            {"Company"},
+            "MAP - IFS Company Code Parts",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandCompany =
+        Table.ExpandTableColumn(
+            MergeCompany,
+            "MAP - IFS Company Code Parts",
+            {"Company Description"},
+            {"Company Description"}
+        ),
+
+    ReorderedColumns =
+        Table.ReorderColumns(
+            ExpandCompany,
+            {
+                "Reporting Entity",
+                "Entity Account",
+                "Entity Account Description",
+                "PL_BS",
+
+                "IFS Account",
+                "IFS Account Description",
+
+                "IFS Department",
+                "Department Description",
+
+                "IFS Location",
+                "Location Description",
+
+                "IFS Market",
+                "Market Description",
+
+                "IFS Company",
+                "Company Description",
+
+                "Account Type",
+                "Account Type Description",
+                "Account Group",
+                "Account Group Description",
+
+
+                "M3 Nominal",
+                "M3 RL",
+                "M3 CST",
+
+                "Active",
+                "Modified",
+                "Version"
+            }
+        ),
+
+    SortedRows =
+        Table.Sort(
+            ReorderedColumns,
+            {{"Entity Account", Order.Ascending}}
+        )
+
+in
+    SortedRows
