@@ -5,7 +5,7 @@ let
     ),
 
     EntityMapping =
-        Source{[Title="MAP - 2002-R - BUK Peel Ports"]}[Items],
+        Source{[Title="MAP - 2001-R - BUK Northern Ireland"]}[Items],
 
     MergeIFSAccounts =
         Table.NestedJoin(
@@ -33,8 +33,37 @@ let
             }
         ),
 
+    PivotedIFSAttributes =
+        Table.Pivot(
+            Table.SelectColumns(
+                #"MAP - IFS Attributes",
+                {"Code Part Value", "Attribute", "Attribute Value Description"}
+            ),
+            List.Distinct(#"MAP - IFS Attributes"[Attribute]),
+            "Attribute",
+            "Attribute Value Description"
+        ),
+
+    MergeIFSAttributes =
+        Table.NestedJoin(
+            ExpandIFSAccounts,
+            {"IFS Account"},
+            PivotedIFSAttributes,
+            {"Code Part Value"},
+            "IFS Attributes",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandIFSAttributes =
+        Table.ExpandTableColumn(
+            MergeIFSAttributes,
+            "IFS Attributes",
+            {"ACC_001", "ACC_002", "ACC_003", "ACC_004", "ACC_005"},
+            {"Management Accounts Summary PL", "Management Accounts Departmental PL", "Stats PL", "Summary BS", "EBITDA"}
+        ),
+
     KeepRequiredColumns =
-        Table.SelectColumns(ExpandIFSAccounts,{"Entity Account", "Reporting Entity", "Entity Account Description", "PL_BS", "M3 Nominal", "M3 RL", "M3 CST", "IFS Account", "IFS Department", "IFS Location", "IFS Market", "IFS Company", "Active", "Modified", "Version", "IFS Account Description", "Account Type", "Account Group"}),
+        Table.SelectColumns(#"ExpandIFSAttributes",{"Entity Account", "Reporting Entity", "Entity Account Description", "PL_BS", "M3 Nominal", "M3 RL", "M3 CST", "IFS Account", "IFS Department", "IFS Location", "IFS Market", "IFS Company", "Active", "Modified", "Version", "IFS Account Description", "Account Type", "Account Group","Management Accounts Summary PL", "Management Accounts Departmental PL", "Stats PL", "Summary BS", "EBITDA"}),
 
     MergeAccountGroups =
         Table.NestedJoin(
