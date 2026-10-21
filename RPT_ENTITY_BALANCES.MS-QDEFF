@@ -1,0 +1,171 @@
+let
+    Source = STG_SELECTED_ENTITY,
+
+    // Add account details
+    MergedAccounts =
+        Table.NestedJoin(
+            Source,
+            {"Account"},
+            #"MAP - IFS Accounts",
+            {"IFS Account"},
+            "AccountDetails",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandedAccounts =
+        Table.ExpandTableColumn(
+            MergedAccounts,
+            "AccountDetails",
+            {
+                "PL_BS",
+                "IFS Account Description",
+                "Account Type",
+                "Account Group"
+            },
+            {
+                "PL_BS",
+                "Account Description",
+                "Account Type",
+                "Account Group"
+            }
+        ),
+
+    // Add department description
+    MergedDepartments =
+        Table.NestedJoin(
+            ExpandedAccounts,
+            {"Department"},
+            #"MAP - IFS Departments",
+            {"Department"},
+            "DepartmentDetails",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandedDepartments =
+        Table.ExpandTableColumn(
+            MergedDepartments,
+            "DepartmentDetails",
+            {"Department Description"},
+            {"Department Description"}
+        ),
+
+    // Add location description
+    MergedLocations =
+        Table.NestedJoin(
+            ExpandedDepartments,
+            {"Location"},
+            #"MAP - IFS Locations",
+            {"Location"},
+            "LocationDetails",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandedLocations =
+        Table.ExpandTableColumn(
+            MergedLocations,
+            "LocationDetails",
+            {"Location Description"},
+            {"Location Description"}
+        ),
+
+    // Add company description
+    MergedCompanies =
+        Table.NestedJoin(
+            ExpandedLocations,
+            {"Company"},
+            #"MAP - IFS Company Code Parts",
+            {"Company"},
+            "CompanyDetails",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandedCompanies =
+        Table.ExpandTableColumn(
+            MergedCompanies,
+            "CompanyDetails",
+            {"Company Description"},
+            {"Company Description"}
+        ),
+
+    // Add market description
+    MergedMarkets =
+        Table.NestedJoin(
+            ExpandedCompanies,
+            {"Market"},
+            #"MAP - IFS Markets",
+            {"Market"},
+            "MarketDetails",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandedMarkets =
+        Table.ExpandTableColumn(
+            MergedMarkets,
+            "MarketDetails",
+            {"Market Description"},
+            {"Market Description"}
+        ),
+
+    // Build the Account + Department key used by PL_MAPPING_MASTER
+AddedPLMappingKey =
+    Table.AddColumn(
+        ExpandedMarkets,
+        "PL Mapping Key",
+        each
+            if [Account] = null then
+                null
+            else if [PL_BS] = "BS" then
+                Text.Upper(
+                    Text.Trim(
+                        Text.From([Account])
+                    )
+                )
+            else if [Department] = null then
+                null
+            else
+                Text.Upper(
+                    Text.Trim(
+                        Text.From([Account])
+                    )
+                )
+                &
+                Text.Upper(
+                    Text.Trim(
+                        Text.From([Department])
+                    )
+                ),
+        type text
+    ),
+    MergedPLMapping =
+        Table.NestedJoin(
+            AddedPLMappingKey,
+            {"PL Mapping Key"},
+            PL_MAPPING_MASTER,
+            {"Concat Code"},
+            "PLMappingDetails",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandedPLMapping =
+        Table.ExpandTableColumn(
+            MergedPLMapping,
+            "PLMappingDetails",
+            {
+                "Mapping_1_Sort",
+                "Mapping_1_Line",
+                "Mapping_2_Sort",
+                "Mapping_2_Line",
+                "Valid-Invalid"
+            },
+            {
+                "Mapping_1_Sort",
+                "Mapping_1_Line",
+                "Mapping_2_Sort",
+                "Mapping_2_Line",
+                "Valid-Invalid"
+            }
+        ),
+    #"Changed Type" = Table.TransformColumnTypes(ExpandedPLMapping,{{"Amount", Currency.Type}}),
+    #"Reordered Columns" = Table.ReorderColumns(#"Changed Type",{"Structure", "Period", "Balance Version", "Structure Node", "Reporting Entity", "Account Type", "Account Group", "Account", "Account Description", "Location", "Location Description", "Department", "Department Description", "Market", "Market Description", "Company", "Company Description", "Entity Account", "PL_BS", "PL Mapping Key", "Mapping_1_Sort", "Mapping_1_Line", "Mapping_2_Sort", "Mapping_2_Line", "Valid-Invalid", "Currency Amount", "Node Currency", "Amount"})
+in
+    #"Reordered Columns"
