@@ -165,7 +165,86 @@ AddedPLMappingKey =
                 "Valid-Invalid"
             }
         ),
-    #"Changed Type" = Table.TransformColumnTypes(ExpandedPLMapping,{{"Amount", Currency.Type}}),
-    #"Reordered Columns" = Table.ReorderColumns(#"Changed Type",{"Structure", "Period", "Balance Version", "Structure Node", "Reporting Entity", "Account Type", "Account Group", "Account", "Account Description", "Location", "Location Description", "Department", "Department Description", "Market", "Market Description", "Company", "Company Description", "Entity Account", "PL_BS", "PL Mapping Key", "Mapping_1_Sort", "Mapping_1_Line", "Mapping_2_Sort", "Mapping_2_Line", "Valid-Invalid", "Currency Amount", "Node Currency", "Amount"})
+
+    AccountAttributeColumns =
+        List.RemoveItems(
+            Table.ColumnNames(#"MAP - IFS Account Attributes"),
+            {"Account"}
+        ),
+
+    MergedAccountAttributes =
+        Table.NestedJoin(
+            ExpandedPLMapping,
+            {"Account"},
+            #"MAP - IFS Account Attributes",
+            {"Account"},
+            "AccountAttributes",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandedAccountAttributes =
+        Table.ExpandTableColumn(
+            MergedAccountAttributes,
+            "AccountAttributes",
+            AccountAttributeColumns,
+            AccountAttributeColumns
+        ),
+
+    ChangedTypes =
+        Table.TransformColumnTypes(
+            ExpandedAccountAttributes,
+            {
+                {"Currency Amount", Currency.Type},
+                {"Amount", Currency.Type},
+                {"Mapping_1_Sort", Int64.Type},
+                {"Mapping_2_Sort", Int64.Type}
+            }
+        ),
+
+    // Position the dynamically generated ACC attribute columns
+    // between the account details and dimensional details.
+    ReorderedColumns =
+        Table.ReorderColumns(
+            ChangedTypes,
+            {
+                "Structure",
+                "Period",
+                "Balance Version",
+                "Structure Node",
+                "Reporting Entity",
+
+                "Account",
+                "Account Description",
+                "Account Type",
+                "Account Group",
+                "PL_BS"
+            }
+            &
+            AccountAttributeColumns
+            &
+            {
+                "Location",
+                "Location Description",
+                "Department",
+                "Department Description",
+                "Market",
+                "Market Description",
+                "Company",
+                "Company Description",
+
+                "Entity Account",
+                "PL Mapping Key",
+                "Mapping_1_Sort",
+                "Mapping_1_Line",
+                "Mapping_2_Sort",
+                "Mapping_2_Line",
+                "Valid-Invalid",
+
+                "Currency Amount",
+                "Node Currency",
+                "Amount"
+            },
+            MissingField.Ignore
+        )
 in
-    #"Reordered Columns"
+    ReorderedColumns
