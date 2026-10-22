@@ -105,11 +105,30 @@ let
             {"Market Description"},
             {"Market Description"}
         ),
+    
+    // Add entity description
+    MergedEntity =
+        Table.NestedJoin(
+            ExpandedMarkets,
+            {"Reporting Entity"},
+            #"MAP - REPORTING ENTITIES",
+            {"Reporting Entity"},
+            "EntityDetails",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandedEntity =
+        Table.ExpandTableColumn(
+            MergedEntity,
+            "EntityDetails",
+            {"Reporting Entity Description"},
+            {"Reporting Entity Description"}
+        ),
 
     // Build the Account + Department key used by PL_MAPPING_MASTER
     AddedPLMappingKey =
         Table.AddColumn(
-            ExpandedMarkets,
+            ExpandedEntity,
             "PL Mapping Key",
             each
                 if [Account] = null then
@@ -212,6 +231,7 @@ let
                 "Balance Version",
                 "Structure Node",
                 "Reporting Entity",
+                "Reporting Entity Description",
 
                 "Account",
                 "Account Description",
