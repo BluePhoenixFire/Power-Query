@@ -30,6 +30,7 @@ let
     Output = [
         ReportingEntity = GetParameter("Reporting Entity"),
         BalanceVersion = GetParameter("Balance Version"),
+        Market = GetParameter("Market"),
         FromPeriod = GetParameter("From Period"),
         ToPeriod = GetParameter("To Period")
     ]
