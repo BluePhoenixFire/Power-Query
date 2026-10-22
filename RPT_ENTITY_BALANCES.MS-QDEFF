@@ -107,34 +107,34 @@ let
         ),
 
     // Build the Account + Department key used by PL_MAPPING_MASTER
-AddedPLMappingKey =
-    Table.AddColumn(
-        ExpandedMarkets,
-        "PL Mapping Key",
-        each
-            if [Account] = null then
-                null
-            else if [PL_BS] = "BS" then
-                Text.Upper(
-                    Text.Trim(
-                        Text.From([Account])
+    AddedPLMappingKey =
+        Table.AddColumn(
+            ExpandedMarkets,
+            "PL Mapping Key",
+            each
+                if [Account] = null then
+                    null
+                else if [PL_BS] = "BS" then
+                    Text.Upper(
+                        Text.Trim(
+                            Text.From([Account])
+                        )
                     )
-                )
-            else if [Department] = null then
-                null
-            else
-                Text.Upper(
-                    Text.Trim(
-                        Text.From([Account])
+                else if [Department] = null then
+                    null
+                else
+                    Text.Upper(
+                        Text.Trim(
+                            Text.From([Account])
+                        )
                     )
-                )
-                &
-                Text.Upper(
-                    Text.Trim(
-                        Text.From([Department])
-                    )
-                ),
-        type text
+                    &
+                    Text.Upper(
+                        Text.Trim(
+                            Text.From([Department])
+                        )
+                    ),
+            type text
     ),
     MergedPLMapping =
         Table.NestedJoin(
@@ -202,7 +202,7 @@ AddedPLMappingKey =
         ),
 
     // Position the dynamically generated ACC attribute columns
-    // between the account details and dimensional details.
+
     ReorderedColumns =
         Table.ReorderColumns(
             ChangedTypes,
@@ -217,18 +217,14 @@ AddedPLMappingKey =
                 "Account Description",
                 "Account Type",
                 "Account Group",
-                "PL_BS"
-            }
-            &
-            AccountAttributeColumns
-            &
-            {
+                "PL_BS",
                 "Location",
                 "Location Description",
                 "Department",
                 "Department Description",
                 "Market",
                 "Market Description",
+                "Derived Market",
                 "Company",
                 "Company Description",
 
@@ -237,7 +233,12 @@ AddedPLMappingKey =
                 "Mapping_1_Sort",
                 "Mapping_1_Line",
                 "Mapping_2_Sort",
-                "Mapping_2_Line",
+                "Mapping_2_Line"
+            }
+            &
+            AccountAttributeColumns
+            &
+            {
                 "Valid-Invalid",
 
                 "Currency Amount",
