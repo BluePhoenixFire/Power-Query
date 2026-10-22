@@ -1,0 +1,182 @@
+let
+    // ============================================================
+    // SETTINGS
+    // ============================================================
+
+    SharePointSite =
+        "https://briggsequipment.sharepoint.com/sites/FinanceMasterData",
+
+    RequiredFolder =
+        "/Shared Documents/CONSOL_DATA/",
+
+    RequiredFile =
+        "FACT_CONSOL_PERIOD_BALANCES.xlsx",
+
+    // ============================================================
+    // FIND SOURCE FILE
+    // ============================================================
+
+    SharePointSource =
+        SharePoint.Files(
+            SharePointSite,
+            [ApiVersion = 15]
+        ),
+
+    FilteredToFile =
+        Table.SelectRows(
+            SharePointSource,
+            each
+                [Name] = RequiredFile
+                and Text.Contains([Folder Path], RequiredFolder)
+        ),
+
+    FileCheck =
+        if Table.RowCount(FilteredToFile) = 0 then
+            error "The Consol period-balance file was not found in SharePoint."
+        else if Table.RowCount(FilteredToFile) > 1 then
+            error "More than one matching Consol period-balance file was found."
+        else
+            FilteredToFile{0}[Content],
+
+    // ============================================================
+    // OPEN WORKBOOK
+    // ============================================================
+
+    WorkbookContents =
+        Excel.Workbook(
+            FileCheck,
+            null,
+            true
+        ),
+
+    ConsolWorksheet =
+        WorkbookContents{
+            [
+                Item = "FACT_CONSOL_PERIOD_BALANCES",
+                Kind = "Sheet"
+            ]
+        }[Data],
+
+    PromotedHeaders =
+        Table.PromoteHeaders(
+            ConsolWorksheet,
+            [PromoteAllScalars = true]
+        ),
+
+    // ============================================================
+    // APPLY TYPES
+    // All dimension codes must remain text.
+    // ============================================================
+
+    ChangedTypes =
+        Table.TransformColumnTypes(
+            PromotedHeaders,
+            {
+                {"Structure", type text},
+                {"Period", type text},
+                {"Balance Version", type text},
+                {"Structure Node", type text},
+                {"Reporting Entity", type text},
+                {"Account", type text},
+                {"Location", type text},
+                {"Department", type text},
+                {"Market", type text},
+                {"Company", type text},
+                {"Currency Amount", Currency.Type},
+                {"Node Currency", type text},
+                {"Amount", Currency.Type}
+            }
+        ),
+            FilteredNonZeroBalances =
+        Table.SelectRows(
+            ChangedTypes,
+            each
+                ([Amount] ?? 0) <> 0
+                or ([Currency Amount] ?? 0) <> 0
+        ),
+
+    RemovedBlankRows =
+        Table.SelectRows(
+            FilteredNonZeroBalances,
+            each
+                [Account] <> null
+                and Text.Trim([Account]) <> ""
+        ),
+
+    CleanedCodes =
+        Table.TransformColumns(
+            RemovedBlankRows,
+            {
+                {
+                    "Reporting Entity",
+                    each if _ = null then null else Text.Trim(_),
+                    type text
+                },
+                {
+                    "Account",
+                    each if _ = null then null else Text.Trim(_),
+                    type text
+                },
+                {
+                    "Location",
+                    each if _ = null then null else Text.Trim(_),
+                    type text
+                },
+                {
+                    "Department",
+                    each if _ = null then null else Text.Trim(_),
+                    type text
+                },
+                {
+                    "Market",
+                    each if _ = null then null else Text.Trim(_),
+                    type text
+                },
+                {
+                    "Company",
+                    each if _ = null then null else Text.Trim(_),
+                    type text
+                }
+            }
+        ),
+    // ============================================================
+    // DERIVE MARKET
+    // Use Market if populated, otherwise lookup Reporting Entity
+    // ============================================================
+
+    MergedReportingEntities =
+        Table.NestedJoin(
+            CleanedCodes,
+            {"Reporting Entity"},
+            #"MAP - REPORTING ENTITIES",
+            {"Reporting Entity"},
+            "ReportingEntityLookup",
+            JoinKind.LeftOuter
+        ),
+
+    ExpandedReportingEntities =
+        Table.ExpandTableColumn(
+            MergedReportingEntities,
+            "ReportingEntityLookup",
+            {"Derived_Market"},
+            {"Lookup Derived Market"}
+        ),
+
+    AddedDerivedMarket =
+        Table.AddColumn(
+            ExpandedReportingEntities,
+            "Derived Market",
+            each
+                if [Market] <> null and Text.Trim([Market]) <> ""
+                then [Market]
+                else [Lookup Derived Market],
+            type text
+        ),
+
+    RemovedLookupColumn =
+        Table.RemoveColumns(
+            AddedDerivedMarket,
+            {"Lookup Derived Market"}
+        )
+in
+    RemovedLookupColumn
