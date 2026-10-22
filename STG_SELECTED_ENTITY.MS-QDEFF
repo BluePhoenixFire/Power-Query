@@ -1,0 +1,71 @@
+let
+    Source =
+        STG_CONSOL_PERIOD_BALANCES,
+
+    SelectedEntity =
+        PARM_REPORT[ReportingEntity],
+
+    SelectedMarket =
+        PARM_REPORT[Market],
+
+    SelectedVersion =
+        PARM_REPORT[BalanceVersion],
+
+    FromPeriod =
+        PARM_REPORT[FromPeriod],
+
+    ToPeriod =
+        PARM_REPORT[ToPeriod],
+
+    FilteredEntity =
+        if SelectedEntity = null or Text.Trim(SelectedEntity) = "" then
+            Source
+        else
+            Table.SelectRows(
+                Source,
+                each [Reporting Entity] = SelectedEntity
+            ),
+
+    FilteredMarket =
+        if SelectedMarket = null or Text.Trim(SelectedMarket) = "" then
+            FilteredEntity
+        else
+            Table.SelectRows(
+                FilteredEntity,
+                each [Derived Market] = SelectedMarket
+            ),
+
+    FilteredVersion =
+        if SelectedVersion = null or Text.Trim(SelectedVersion) = "" then
+            FilteredMarket
+        else
+            Table.SelectRows(
+                FilteredMarket,
+                each [Balance Version] = SelectedVersion
+            ),
+
+    FilteredPeriods =
+        Table.SelectRows(
+            FilteredVersion,
+            each
+                (FromPeriod = null or FromPeriod = "" or [Period] >= FromPeriod)
+                and
+                (ToPeriod = null or ToPeriod = "" or [Period] <= ToPeriod)
+        ),
+
+    NoDataCheck =
+        if Table.RowCount(FilteredPeriods) = 0 then
+            error
+                "No Consol balances were found for the selected parameters."
+        else
+            FilteredPeriods,
+
+    AddedEntityAccountKey =
+        Table.AddColumn(
+            NoDataCheck,
+            "Entity Account",
+            each [Reporting Entity] & "|" & [Account],
+            type text
+        )
+in
+    AddedEntityAccountKey
